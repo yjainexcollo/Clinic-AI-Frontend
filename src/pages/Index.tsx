@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { intakeAPI, IntakeRequest, IntakeResponse } from "../api";
-import { answerIntakeBackend, editAnswerBackend, OCRQualityInfo } from "../services/patientService";
+import { answerIntakeBackend, editAnswerBackend, OCRQualityInfo, BACKEND_BASE_URL } from "../services/patientService";
 import { SessionManager } from "../utils/session";
 import { COPY } from "../copy";
 import SymptomSelector from "../components/SymptomSelector";
@@ -625,7 +625,7 @@ const Index = () => {
                                 form.append("visit_id", effectiveVisitId);
                                 form.append("answer", newAnswer);
                                 form.append("medication_images", editFile);
-                                const resp = await fetch("http://localhost:8000/patients/consultations/answer", {
+                                const resp = await fetch(`${BACKEND_BASE_URL}/patients/consultations/answer`, {
                                   method: "POST",
                                   body: form,
                                 });
@@ -798,7 +798,7 @@ const Index = () => {
                   onClick={async () => {
                     try {
                       if (!patientId || !visitId) return;
-                      const resp = await fetch(`http://localhost:8000/notes/${patientId}/visits/${visitId}/transcript`);
+                      const resp = await fetch(`${BACKEND_BASE_URL}/notes/${patientId}/visits/${visitId}/transcript`);
                       if (!resp.ok) {
                         const txt = await resp.text();
                         throw new Error(`Failed to fetch transcript ${resp.status}: ${txt}`);
@@ -872,7 +872,7 @@ const Index = () => {
                   form.append('patient_id', patientId);
                   form.append('visit_id', visitId);
                   form.append('audio_file', file);
-                  const resp = await fetch('http://localhost:8000/notes/transcribe', {
+                  const resp = await fetch(`${BACKEND_BASE_URL}/notes/transcribe`, {
                     method: 'POST',
                     body: form,
                   });
