@@ -78,7 +78,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
           </CardHeader>
           <CardContent className="flex items-center justify-center py-12">
             <div className="text-center">
-              <RefreshCw className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+              <div className="h-8 w-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-gray-600">Loading your pre-visit summary...</p>
             </div>
           </CardContent>
@@ -107,18 +107,8 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               </AlertDescription>
             </Alert>
             <div className="flex justify-center mt-6 space-x-3">
-              <Button onClick={() => loadSummary(true)} disabled={refreshing}>
-                {refreshing ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Retrying...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Try Again
-                  </>
-                )}
+              <Button onClick={() => loadSummary()}>
+                Try Again
               </Button>
               <Button variant="outline" onClick={onClose}>
                 Close
