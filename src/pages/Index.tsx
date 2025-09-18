@@ -880,6 +880,9 @@ const Index = () => {
                     audio_file: file.name
                   });
                   
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+                  
                   const resp = await fetch(`${BACKEND_BASE_URL}/notes/transcribe`, {
                     method: 'POST',
                     body: form,
@@ -887,7 +890,10 @@ const Index = () => {
                       'Accept': 'application/json',
                     },
                     mode: 'cors',
+                    signal: controller.signal,
                   });
+                  
+                  clearTimeout(timeoutId);
                   
                   console.log('Response status:', resp.status);
                   console.log('Response headers:', Object.fromEntries(resp.headers.entries()));
@@ -900,7 +906,14 @@ const Index = () => {
                   setShowUploadAudio(false);
                   alert('Audio uploaded. Transcription started.');
                 } catch (err: any) {
-                  setUploadAudioError(err?.message || 'Failed to upload audio');
+                  console.error('Audio upload error:', err);
+                  if (err.name === 'AbortError') {
+                    setUploadAudioError('Upload timed out. Please try again with a shorter audio file.');
+                  } else if (err.message.includes('Failed to fetch')) {
+                    setUploadAudioError('Network error. Please check your connection and try again.');
+                  } else {
+                    setUploadAudioError(err?.message || 'Failed to upload audio. Please try again.');
+                  }
                 } finally {
                   setIsTranscribingAudio(false);
                 }
