@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { intakeAPI, IntakeRequest, IntakeResponse } from "../api";
-import { answerIntakeBackend, editAnswerBackend, OCRQualityInfo, BACKEND_BASE_URL } from "../services/patientService";
+import { answerIntakeBackend, editAnswerBackend, OCRQualityInfo, BACKEND_BASE_URL, uploadMedicationImages } from "../services/patientService";
 import { SessionManager } from "../utils/session";
 import { COPY } from "../copy";
 import SymptomSelector from "../components/SymptomSelector";
 import OCRQualityFeedback from "../components/OCRQualityFeedback";
 import SummaryView from "../components/SummaryView";
 import TranscriptView from "../components/TranscriptView";
+import MedicationImageUploader from "../components/MedicationImageUploader";
 
 interface Question {
   text: string;
@@ -41,7 +42,6 @@ const Index = () => {
   const [allowsImageUpload, setAllowsImageUpload] = useState<boolean>(false);
   const [showUploadAudio, setShowUploadAudio] = useState<boolean>(false);
   const [isTranscribingAudio, setIsTranscribingAudio] = useState<boolean>(false);
-  const [isProcessingAudio, setIsProcessingAudio] = useState<boolean>(false);
   const [uploadAudioError, setUploadAudioError] = useState<string>("");
   const [showTranscript, setShowTranscript] = useState<boolean>(false);
   const [transcriptText, setTranscriptText] = useState<string>("");
@@ -204,16 +204,25 @@ const Index = () => {
       // Use backend-provided flag to decide if image should be sent with this answer
       const fileInputEl = document.querySelector('input[type="file"]') as HTMLInputElement | null;
       const chosenFile = fileInputEl?.files && fileInputEl.files[0] ? fileInputEl.files[0] : undefined;
-      const imageFile = allowsImageUpload ? ((window as any).clinicaiMedicationFile || chosenFile) : undefined;
+      const stagedFiles: File[] | undefined = allowsImageUpload ? ((window as any).clinicaiMedicationFiles as File[] | undefined) : undefined;
+      const imageFile = undefined; // we prefer stagedFiles now
+      // If we have staged images, hit the webhook route first so the images route is definitely called
+      if (stagedFiles && stagedFiles.length) {
+        try {
+          await uploadMedicationImages(patientId, effectiveVisitId!, stagedFiles);
+        } catch (e) {
+          console.error("Image upload failed:", e);
+          // Continue with answer submission even if images failed, but keep user informed
+        }
+      }
+
       const response = await answerIntakeBackend({
         patient_id: patientId,
         visit_id: effectiveVisitId!,
         answer: answerToSend,
-      }, imageFile);
+      }, imageFile, stagedFiles && stagedFiles.length ? stagedFiles : undefined);
       // Clear the temp file reference after sending
-      if (imageFile) {
-        (window as any).clinicaiMedicationFile = null;
-      }
+      (window as any).clinicaiMedicationFiles = undefined;
       if (response && typeof response.max_questions === "number") {
         localStorage.setItem(`maxq_${effectiveVisitId}`, String(response.max_questions));
       }
@@ -545,18 +554,11 @@ const Index = () => {
                           placeholder="Type your answer here..."
                           required
                         />
-              {allowsImageUpload && (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="file"
-                              accept="image/*;capture=camera"
-                              onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                (window as any).clinicaiMedicationFile = f || null;
-                              }}
-                              className="block w-full text-sm text-gray-700"
-                            />
-                          </div>
+                        {allowsImageUpload && patientId && (visitId || localStorage.getItem(`visit_${patientId}`)) && (
+                          <MedicationImageUploader
+                            patientId={patientId}
+                            visitId={(visitId || localStorage.getItem(`visit_${patientId}`)) as string}
+                          />
                         )}
                       </div>
                     )}
@@ -598,17 +600,16 @@ const Index = () => {
                           onChange={(e) => setEditingValue(e.target.value)}
                           className="medical-input flex-1"
                         />
-                        {/* Optional image upload for medication edits */}
-                        {(/medication|medicine|prescription/i.test(qa.text)) && (
-                          <input
-                            type="file"
-                            accept="image/*;capture=camera"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              (window as any).clinicaiMedicationEditFile = f || null;
-                            }}
-                            className="block w-40 text-xs text-gray-700"
-                          />
+                        {/* Manage images for this question (multi-upload, delete) */}
+                        {(/medication|medicine|prescription/i.test(qa.text)) && patientId && (visitId || localStorage.getItem(`visit_${patientId}`)) && (
+                          <div className="w-full">
+                            <MedicationImageUploader
+                              patientId={patientId}
+                              visitId={(visitId || localStorage.getItem(`visit_${patientId}`)) as string}
+                              title="Update prescription images (optional)"
+                              onChange={() => {/* optional refresh hooks */}}
+                            />
+                          </div>
                         )}
                         <button
                           onClick={async () => {
@@ -616,30 +617,7 @@ const Index = () => {
                             if (!patientId || !effectiveVisitId) return;
                             try {
                               setIsLoading(true);
-                              // If medication edit and file present, append markers after upload via answer API for OCR pipeline
-                              let newAnswer = editingValue.trim();
-                              const isMed = /medication|medicine|prescription/i.test(qa.text);
-                              const editFile = (window as any).clinicaiMedicationEditFile as File | null;
-                              if (isMed && editFile) {
-                                // Reuse answer endpoint to upload file and get OCR markers composed
-                                const form = new FormData();
-                                form.append("patient_id", patientId);
-                                form.append("visit_id", effectiveVisitId);
-                                form.append("answer", newAnswer);
-                                form.append("medication_images", editFile);
-                                const resp = await fetch(`${BACKEND_BASE_URL}/patients/consultations/answer`, {
-                                  method: "POST",
-                                  body: form,
-                                });
-                                if (resp.ok) {
-                                  try {
-                                    const j = await resp.json();
-                                    // try to extract appended markers from next round not available; keep same answer and rely on markers in backend
-                                  } catch {}
-                                  // augment answer with markers minimally so backend edit parser can pick them up
-                                  newAnswer = `${newAnswer}`; // markers already added by answer flow on server
-                                }
-                              }
+                              const newAnswer = editingValue.trim();
                               const res = await editAnswerBackend({
                                 patient_id: patientId,
                                 visit_id: effectiveVisitId,
@@ -792,10 +770,11 @@ const Index = () => {
                 </button>
                 <button
                   onClick={() => setShowUploadAudio(true)}
-                  className="w-full bg-purple-600 text-white py-3 px-4 rounded-md hover:bg-purple-700 transition-colors font-medium"
+                  className="w-full bg-indigo-600 text-white py-3 px-4 rounded-md hover:bg-indigo-700 transition-colors font-medium"
                 >
-                  Upload Audio & Transcribe
+                  Upload Transcript
                 </button>
+                
                 <button
                   onClick={async () => {
                     try {
@@ -890,30 +869,29 @@ const Index = () => {
                   
                   clearTimeout(timeoutId);
                   
-                  console.log('Response status:', resp.status);
-                  console.log('Response headers:', Object.fromEntries(resp.headers.entries()));
-                  
+                  // State machine: uploading done -> processing with backoff polling
                   if (resp.status === 202) {
-                    // queued → keep modal open and show processing until transcript is saved
-                    setIsProcessingAudio(true);
-                    const pollStart = Date.now();
+                    setShowUploadAudio(false);
+                    const start = Date.now();
+                    let attempt = 0;
+                    const maxMs = 300000; // 5 minutes
                     const poll = async () => {
+                      attempt += 1;
+                      const delay = Math.min(6000, 2000 + attempt * 500);
                       try {
                         const t = await fetch(`${BACKEND_BASE_URL}/notes/${patientId}/visits/${visitId}/transcript`);
                         if (t.ok) {
                           const data = await t.json();
                           setTranscriptText(data.transcript || '');
-                          setIsProcessingAudio(false);
-                          setShowUploadAudio(false);
                           setShowTranscript(true);
                           return;
                         }
                       } catch {}
-                      if (Date.now() - pollStart < 300000) { // up to 5 minutes
-                        setTimeout(poll, 3000);
+                      if (Date.now() - start < maxMs) {
+                        setTimeout(poll, delay);
                       } else {
-                        setIsProcessingAudio(false);
-                        alert('Audio uploaded. Processing may take longer; try View Transcript in a moment.');
+                        setUploadAudioError('Processing timed out. Please re-upload your audio.');
+                        setShowUploadAudio(true);
                       }
                     };
                     poll();
@@ -954,25 +932,19 @@ const Index = () => {
                   type="button"
                   onClick={() => setShowUploadAudio(false)}
                   className="px-4 py-2 rounded bg-gray-200 text-gray-800"
-                  disabled={isTranscribingAudio || isProcessingAudio}
+                  disabled={isTranscribingAudio}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 rounded bg-purple-600 text-white disabled:opacity-60"
-                  disabled={isTranscribingAudio || isProcessingAudio}
+                  disabled={isTranscribingAudio}
                 >
-                  {isProcessingAudio ? 'Processing...' : (isTranscribingAudio ? 'Uploading...' : 'Upload & Transcribe')}
+                  {isTranscribingAudio ? 'Uploading...' : 'Upload & Transcribe'}
                 </button>
               </div>
             </form>
-            {isProcessingAudio && (
-              <div className="mt-3 text-sm text-gray-600 flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                Processing audio… this can take a minute.
-              </div>
-            )}
           </div>
         </div>
       )}

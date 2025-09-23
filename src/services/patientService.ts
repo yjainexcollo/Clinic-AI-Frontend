@@ -3,9 +3,20 @@ const API_ENDPOINT =
   "https://n8n-excollo.azurewebsites.net/webhook";
 
 // Backend API base URL (FastAPI)
-const BACKEND_BASE_URL: string =
+let BACKEND_BASE_URL: string =
   ((import.meta as any).env?.VITE_BACKEND_BASE_URL as string) ||
-  "https://clinic-ai.onrender.com";
+  "http://localhost:8000";
+
+// Normalize common dev misconfigurations for browser access
+try {
+  const raw = BACKEND_BASE_URL?.trim();
+  if (raw && /(^|\/)0\.0\.0\.0(?=[:/]|$)/.test(raw)) {
+    BACKEND_BASE_URL = raw.replace(/0\.0\.0\.0/g, "localhost");
+  }
+  if (BACKEND_BASE_URL && !/^https?:\/\//i.test(BACKEND_BASE_URL)) {
+    BACKEND_BASE_URL = `http://${BACKEND_BASE_URL}`;
+  }
+} catch {}
 
 export { BACKEND_BASE_URL };
 
@@ -87,15 +98,17 @@ export async function registerPatientBackend(payload: {
 // Answer intake question via backend
 export async function answerIntakeBackend(
   payload: BackendAnswerRequest,
-  imageFile?: File
+  imageFile?: File,
+  imageFiles?: File[]
 ): Promise<BackendAnswerResponse> {
   let resp: Response;
-  if (imageFile) {
+  const files: File[] | undefined = imageFiles && imageFiles.length ? imageFiles : (imageFile ? [imageFile] : undefined);
+  if (files && files.length) {
     const form = new FormData();
     form.append("patient_id", payload.patient_id);
     form.append("visit_id", payload.visit_id);
     form.append("answer", payload.answer);
-    form.append("medication_images", imageFile);
+    files.forEach((f) => form.append("medication_images", f));
     resp = await fetch(`${BACKEND_BASE_URL}/patients/consultations/answer`, {
       method: "POST",
       body: form,
@@ -107,6 +120,27 @@ export async function answerIntakeBackend(
       body: JSON.stringify(payload),
     });
   }
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`Backend error ${resp.status}: ${text}`);
+  }
+  return resp.json();
+}
+
+// Upload multiple medication images via webhook route
+export async function uploadMedicationImages(
+  patientId: string,
+  visitId: string,
+  files: File[]
+): Promise<{ uploaded_images: Array<{ id: string; filename: string; content_type?: string }>; status: string }>{
+  const form = new FormData();
+  files.forEach((f) => form.append("images", f));
+  form.append("patient_id", patientId);
+  form.append("visit_id", visitId);
+  const resp = await fetch(`${BACKEND_BASE_URL}/patients/webhook/images`, {
+    method: "POST",
+    body: form,
+  });
   if (!resp.ok) {
     const text = await resp.text();
     throw new Error(`Backend error ${resp.status}: ${text}`);
@@ -277,7 +311,7 @@ export async function getPatient(
 export async function getPreVisitSummary(
   patientId: string,
   visitId: string
-): Promise<{ patient_id: string; visit_id: string; summary: string; generated_at: string }> {
+): Promise<{ patient_id: string; visit_id: string; summary: string; generated_at: string; medication_images?: Array<{ id: string; filename: string; content_type?: string }> }> {
   try {
     const response = await fetch(`${BACKEND_BASE_URL}/patients/${patientId}/visits/${visitId}/summary`, {
       method: "GET",
