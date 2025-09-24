@@ -600,6 +600,7 @@ const Index = () => {
                           <MedicationImageUploader
                             patientId={patientId}
                             visitId={(visitId || localStorage.getItem(`visit_${patientId}`)) as string}
+                            title="What medications do you take? (upload images, optional)"
                           />
                         )}
                       </div>
@@ -648,7 +649,7 @@ const Index = () => {
                             <MedicationImageUploader
                               patientId={patientId}
                               visitId={(visitId || localStorage.getItem(`visit_${patientId}`)) as string}
-                              title="Update prescription images (optional)"
+                              title="What medications do you take? (upload images, optional)"
                               onChange={() => {/* optional refresh hooks */}}
                             />
                           </div>
@@ -862,7 +863,27 @@ const Index = () => {
                         throw new Error(`Failed to fetch transcript ${resp.status}: ${txt}`);
                       }
                       const data = await resp.json();
-                      setTranscriptText(data.transcript || '');
+                      let transcriptContent = data.transcript || '';
+                      const isRaw = transcriptContent && !transcriptContent.includes('"Doctor"') && !transcriptContent.includes('"Patient"');
+                      if (isRaw) {
+                        try {
+                          const structureResponse = await fetch(`${BACKEND_BASE_URL}/notes/${patientId}/visits/${visitId}/dialogue/structure`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                          if (structureResponse.ok) {
+                            const structureData = await structureResponse.json();
+                            const dlg = structureData?.dialogue;
+                            if (Array.isArray(dlg)) {
+                              transcriptContent = JSON.stringify(dlg);
+                            } else if (dlg && typeof dlg === 'object') {
+                              if (typeof dlg.text === 'string') {
+                                transcriptContent = dlg.text;
+                              } else {
+                                transcriptContent = JSON.stringify(dlg);
+                              }
+                            }
+                          }
+                        } catch {}
+                      }
+                      setTranscriptText(transcriptContent);
                       setShowTranscript(true);
                     } catch (e) {
                       alert('Transcript not available yet.');
@@ -966,7 +987,39 @@ const Index = () => {
                         const t = await fetch(`${BACKEND_BASE_URL}/notes/${patientId}/visits/${visitId}/transcript`);
                         if (t.ok) {
                           const data = await t.json();
-                          setTranscriptText(data.transcript || '');
+                          let transcriptContent = data.transcript || '';
+                          
+                          // Check if transcript appears to be raw (not structured JSON)
+                          const isRawTranscript = !transcriptContent.includes('"Doctor"') && !transcriptContent.includes('"Patient"');
+                          
+                          if (isRawTranscript && transcriptContent.trim()) {
+                            // Try to structure the dialogue using the backend endpoint
+                            try {
+                              const structureResponse = await fetch(`${BACKEND_BASE_URL}/notes/${patientId}/visits/${visitId}/dialogue/structure`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' }
+                              });
+                              if (structureResponse.ok) {
+                                const structureData = await structureResponse.json();
+                                const dlg = structureData?.dialogue;
+                                if (Array.isArray(dlg)) {
+                                  // Proper ordered turns
+                                  transcriptContent = JSON.stringify(dlg);
+                                } else if (dlg && typeof dlg === 'object') {
+                                  // Fallback shape { text: "..." } or { Doctor: "...", Patient: "..." }
+                                  if (typeof dlg.text === 'string') {
+                                    transcriptContent = dlg.text;
+                                  } else {
+                                    transcriptContent = JSON.stringify(dlg);
+                                  }
+                                }
+                              }
+                            } catch (e) {
+                              console.warn('Failed to structure dialogue:', e);
+                            }
+                          }
+                          
+                          setTranscriptText(transcriptContent);
                           setShowTranscriptProcessing(false);
                           setShowTranscript(true);
                           return;
