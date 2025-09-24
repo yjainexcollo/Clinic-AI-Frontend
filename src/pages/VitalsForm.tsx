@@ -162,8 +162,11 @@ const VitalsForm: React.FC = () => {
       // Show SOAP generation progress and trigger generation idempotently
       setGeneratingSoap(true);
       try {
+        // Ensure we pass the internal id expected by backend: use current patientId as-is
         await generateSoapNote(patientId, visitId);
-      } catch {}
+      } catch (e) {
+        // Ignore; we'll still poll for readiness
+      }
 
       // Poll for SOAP availability, then navigate to SOAP view
       const start = Date.now();
