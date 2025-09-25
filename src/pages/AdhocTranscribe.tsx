@@ -13,6 +13,7 @@ const AdhocTranscribe: React.FC = () => {
   const [dialogue, setDialogue] = useState<Array<Record<string, string>>>([]);
   const [audioUrl, setAudioUrl] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const recorderMimeRef = useRef<string>("");
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
@@ -82,15 +83,33 @@ const AdhocTranscribe: React.FC = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-      const mediaRecorder = new MediaRecorder(stream);
+      // Pick a Safari-friendly MIME type when available
+      const mimeCandidates = [
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
+        'audio/webm;codecs=opus',
+        'audio/webm'
+      ];
+      let chosenMime = "";
+      for (const m of mimeCandidates) {
+        try {
+          if ((window as any).MediaRecorder && (MediaRecorder as any).isTypeSupported && MediaRecorder.isTypeSupported(m)) {
+            chosenMime = m; break;
+          }
+        } catch {}
+      }
+      const mediaRecorder = chosenMime ? new MediaRecorder(stream, { mimeType: chosenMime }) : new MediaRecorder(stream);
+      recorderMimeRef.current = chosenMime;
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
       mediaRecorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data);
       };
       mediaRecorder.onstop = async () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const recordedFile = new File([blob], `recording_${Date.now()}.webm`, { type: "audio/webm" });
+        const container = recorderMimeRef.current.includes('mp4') ? 'audio/mp4' : 'audio/webm';
+        const ext = recorderMimeRef.current.includes('mp4') ? 'm4a' : 'webm';
+        const blob = new Blob(chunksRef.current, { type: container });
+        const recordedFile = new File([blob], `recording_${Date.now()}.${ext}`, { type: container });
         setFile(recordedFile);
         try { if (audioUrl) URL.revokeObjectURL(audioUrl); } catch {}
         setAudioUrl(URL.createObjectURL(blob));
@@ -187,7 +206,7 @@ const AdhocTranscribe: React.FC = () => {
       <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-4">
         <div className="space-y-2">
           <label className="block text-sm font-medium">Select audio file</label>
-          <input type="file" accept="audio/*,video/mpeg,.mpeg,.mpg" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          <input type="file" accept="audio/*,audio/mp4,.m4a,video/mpeg,video/mp4,.mp4,.mpeg,.mpg" onChange={(e) => setFile(e.target.files?.[0] || null)} />
         </div>
 
         <div className="space-y-2">
@@ -209,7 +228,7 @@ const AdhocTranscribe: React.FC = () => {
           {/* Playback of recorded audio (if any) */}
           {audioUrl && (
             <div className="pt-2">
-              <audio controls src={audioUrl} className="w-full" />
+              <audio controls src={audioUrl} className="w-full" playsInline preload="metadata" />
             </div>
           )}
         </div>
