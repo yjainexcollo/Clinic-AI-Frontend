@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { FileText, Calendar, User, Clock, X } from 'lucide-react';
+import { FileText, Calendar, User, Clock, X, AlertCircle } from 'lucide-react';
 import { getPreVisitSummary, BACKEND_BASE_URL } from '../services/patientService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { renderMarkdownText } from '../utils/markdownRenderer';
 
 interface SummaryViewProps {
   patientId: string;
@@ -19,6 +19,7 @@ interface SummaryData {
   summary: string;
   generated_at: string;
   medication_images?: Array<{ id: string; filename: string; content_type?: string }>;
+  red_flags?: Array<{ type: string; question: string; answer: string; message: string; detection_method?: string }>;
 }
 
 export const SummaryView: React.FC<SummaryViewProps> = ({
@@ -36,8 +37,25 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
       setLoading(true);
       setError(null);
 
-      const data = await getPreVisitSummary(patientId, visitId);
-      setSummaryData(data);
+      // First try to get existing summary
+      try {
+        const data = await getPreVisitSummary(patientId, visitId);
+        setSummaryData(data);
+      } catch (err) {
+        // If summary doesn't exist, try to generate it
+        console.log('Summary not found, attempting to generate...');
+        try {
+          const { workflowService } = await import('../services/workflowService');
+          await workflowService.generatePreVisitSummary(patientId, visitId);
+          
+          // After generation, fetch the summary
+          const data = await getPreVisitSummary(patientId, visitId);
+          setSummaryData(data);
+        } catch (genErr) {
+          console.error('Error generating summary:', genErr);
+          throw genErr;
+        }
+      }
     } catch (err) {
       console.error('Error loading summary:', err);
       setError(err instanceof Error ? err.message : 'Failed to load summary');
@@ -113,6 +131,23 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               <Button onClick={() => loadSummary()}>
                 {language === 'sp' ? 'Intentar de nuevo' : 'Try Again'}
               </Button>
+              <Button 
+                variant="outline" 
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    setError(null);
+                    const { workflowService } = await import('../services/workflowService');
+                    await workflowService.generatePreVisitSummary(patientId, visitId);
+                    await loadSummary();
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Failed to generate summary');
+                    setLoading(false);
+                  }
+                }}
+              >
+                {language === 'sp' ? 'Generar Resumen' : 'Generate Summary'}
+              </Button>
               <Button variant="outline" onClick={onClose}>
                 {language === 'sp' ? 'Cerrar' : 'Close'}
               </Button>
@@ -127,41 +162,9 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
     return null;
   }
 
-  // Format summary: bold known headings without showing markdown symbols
+  // Format summary: render markdown-formatted text with proper styling
   const renderSummary = (text: string) => {
-    const lines = (text || '').split(/\n+/);
-    const headings = language === 'sp'
-      ? [
-          'Motivo de Consulta:',
-          'HPI:',
-          'Historia:',
-          'Medicaciones actuales:',
-          'Revisión de Sistemas:',
-        ]
-      : [
-          'Chief Complaint:',
-          'HPI:',
-          'History:',
-          'Current Medication:',
-          'Review of Systems:',
-        ];
-    return (
-      <div className="space-y-3">
-        {lines.map((line, idx) => {
-          const key = `l-${idx}`;
-          const match = headings.find(h => line.startsWith(h));
-          if (match) {
-            const rest = line.slice(match.length).trimStart();
-            return (
-              <div key={key}>
-                <strong>{match}</strong> {rest}
-              </div>
-            );
-          }
-          return <div key={key}>{line}</div>;
-        })}
-      </div>
-    );
+    return renderMarkdownText(text);
   };
 
   return (
@@ -190,12 +193,12 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
             <div className="flex items-center space-x-2">
               <User className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600">{language === 'sp' ? 'ID del Paciente:' : 'Patient ID:'}</span>
-              <Badge variant="secondary">{summaryData.patient_id}</Badge>
+              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">{summaryData.patient_id}</span>
             </div>
             <div className="flex items-center space-x-2">
               <FileText className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600">{language === 'sp' ? 'ID de la Visita:' : 'Visit ID:'}</span>
-              <Badge variant="secondary">{summaryData.visit_id}</Badge>
+              <span className="px-2 py-1 bg-gray-100 text-gray-800 text-xs rounded">{summaryData.visit_id}</span>
             </div>
             <div className="flex items-center space-x-2">
               <Clock className="h-4 w-4 text-gray-500" />
@@ -203,6 +206,35 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
               <span className="text-sm font-medium">{formatDate(summaryData.generated_at)}</span>
             </div>
           </div>
+
+          {/* Red Flags Section */}
+          {summaryData.red_flags && summaryData.red_flags.length > 0 && (
+            <div className="mb-6">
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  <div className="font-semibold mb-2">
+                    {language === 'sp' ? '🚨 Banderas Rojas Detectadas' : '🚨 Red Flags Detected'}
+                  </div>
+                  <div className="space-y-2">
+                    {summaryData.red_flags.map((flag, index) => (
+                      <div key={index} className="text-sm">
+                        <div className="font-medium">
+                          {flag.message}
+                        </div>
+                        {flag.type === 'abusive_language' && (
+                          <div className="mt-1 text-red-700">
+                            <div><strong>{language === 'sp' ? 'Pregunta:' : 'Question:'}</strong> {flag.question}</div>
+                            <div><strong>{language === 'sp' ? 'Respuesta:' : 'Response:'}</strong> {flag.answer}</div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
 
           {/* Summary Content */}
           <div className="prose prose-sm max-w-none">
@@ -221,7 +253,7 @@ export const SummaryView: React.FC<SummaryViewProps> = ({
                     {summaryData.medication_images.map((img) => (
                       <div key={img.id} className="border rounded p-1 bg-gray-50">
                         <img
-                          src={`${BACKEND_BASE_URL}/patients/images/${img.id}/content`}
+                          src={`${BACKEND_BASE_URL}/patients/${patientId}/visits/${visitId}/intake-images/${img.id}/content`}
                           alt={img.filename}
                           className="w-full h-24 object-cover rounded"
                         />
