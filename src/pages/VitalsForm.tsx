@@ -253,9 +253,11 @@ const VitalsForm: React.FC = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const isWalkIn = isWalkInPatient || urlParams.get('walkin') === 'true';
         
+        // For scheduled workflow, use done=1 to show the "Intake Complete" page with all buttons
+        // For walk-in workflow, use walkin=true to show the walk-in specific page
         const redirectUrl = isWalkIn 
           ? `/intake/${encodeURIComponent(patientId)}?v=${encodeURIComponent(effectiveVisitId)}&walkin=true`
-          : `/intake/${encodeURIComponent(patientId)}?v=${encodeURIComponent(effectiveVisitId)}`;
+          : `/intake/${encodeURIComponent(patientId)}?v=${encodeURIComponent(effectiveVisitId)}&done=1`;
         
         // Show brief success message, then redirect
         setTimeout(() => {

@@ -49,6 +49,7 @@ const Index = () => {
   const [hasPostVisitSummary, setHasPostVisitSummary] = useState<boolean>(false);
   const [hasTranscript, setHasTranscript] = useState<boolean>(false);
   const [hasVitals, setHasVitals] = useState<boolean>(false);
+  const [hasSoap, setHasSoap] = useState<boolean>(false);
   const [editingValue, setEditingValue] = useState<string>("");
   const [ocrQuality, setOcrQuality] = useState<OCRQualityInfo | null>(null);
   const [showOcrFeedback, setShowOcrFeedback] = useState<boolean>(false);
@@ -453,6 +454,48 @@ const Index = () => {
 
     if (patientId && visitId && isComplete) {
       checkVitals();
+    }
+  }, [patientId, visitId, isComplete]);
+
+  // Check if SOAP note exists
+  useEffect(() => {
+    const checkSoap = async () => {
+      if (!patientId || !visitId || !isComplete) return;
+      
+      // First check localStorage flag
+      const soapKey = `soap_done_${patientId}_${visitId}`;
+      const localStorageFlag = localStorage.getItem(soapKey) === '1';
+      
+      if (localStorageFlag) {
+        setHasSoap(true);
+        return;
+      }
+      
+      // If no localStorage flag, check API
+      try {
+        const response = await fetch(`${BACKEND_BASE_URL}/notes/${encodeURIComponent(patientId)}/visits/${encodeURIComponent(visitId)}/soap`, {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
+        if (response.ok) {
+          const responseData = await response.json();
+          const data = responseData.data || responseData;
+          const hasApiSoap = !!data && (data.subjective || data.assessment || data.plan);
+          setHasSoap(hasApiSoap);
+          // If API has SOAP but no localStorage flag, set the flag
+          if (hasApiSoap) {
+            localStorage.setItem(soapKey, '1');
+          }
+        } else {
+          setHasSoap(false);
+        }
+      } catch (e) {
+        setHasSoap(false);
+      }
+    };
+
+    if (patientId && visitId && isComplete) {
+      checkSoap();
     }
   }, [patientId, visitId, isComplete]);
 
@@ -1237,6 +1280,11 @@ const Index = () => {
                 {/* Step 4: Generate SOAP Summary (Walk-in) / Step 5: Generate SOAP Summary (Scheduled) */}
                 <button
                   onClick={async () => {
+                    if (hasSoap) {
+                      alert('SOAP summary already generated for this visit. Use "View SOAP Summary" to see it.');
+                      return;
+                    }
+                    
                     try {
                       if (!patientId || !visitId) return;
                       setShowPostVisitProcessing(true); // Reuse loading state
@@ -1248,6 +1296,11 @@ const Index = () => {
                       });
                       
                       if (response.ok) {
+                        // Set localStorage flag and update state
+                        try {
+                          localStorage.setItem(`soap_done_${patientId}_${visitId}`, '1');
+                        } catch {}
+                        setHasSoap(true);
                         alert('SOAP summary generation started successfully! You can view it using the "View SOAP Summary" button.');
                       } else {
                         const errorData = await response.json();
@@ -1275,9 +1328,16 @@ const Index = () => {
                       alert('Failed to generate SOAP summary. Please ensure transcript and vitals are complete.');
                     }
                   }}
-                  className="w-full bg-orange-600 text-white py-3 px-4 rounded-md hover:bg-orange-700 transition-colors font-medium"
+                  disabled={hasSoap}
+                  className={`w-full py-3 px-4 rounded-md transition-colors font-medium ${
+                    hasSoap 
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                      : 'bg-orange-600 text-white hover:bg-orange-700'
+                  }`}
                 >
-                  {isWalkInPatient ? '4' : '5'}. Generate SOAP Summary
+                  {hasSoap 
+                    ? `${isWalkInPatient ? '4' : '5'}. SOAP Summary Already Generated` 
+                    : `${isWalkInPatient ? '4' : '5'}. Generate SOAP Summary`}
                 </button>
                 
                 {/* Step 5: View SOAP Summary (Walk-in) / Step 6: View SOAP Summary (Scheduled) */}
