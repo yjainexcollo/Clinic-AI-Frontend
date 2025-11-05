@@ -92,24 +92,8 @@ const WalkInPostVisit: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate(`/walk-in-soap/${encodeURIComponent(patientId)}/${encodeURIComponent(visitId)}`);
-  };
-
-  const handleComplete = () => {
-    // Navigate back to workflow selector or show completion message
-    navigate("/workflow-selector");
-  };
-
-  const handleViewTranscript = () => {
-    navigate(`/transcript-view/${encodeURIComponent(patientId)}/${encodeURIComponent(visitId)}`);
-  };
-
-  const handleViewVitals = () => {
-    navigate(`/vitals/${encodeURIComponent(patientId)}/${encodeURIComponent(visitId)}`);
-  };
-
-  const handleViewSoap = () => {
-    navigate(`/walk-in-soap/${encodeURIComponent(patientId)}/${encodeURIComponent(visitId)}`);
+    // Navigate back to the main workflow page (intake page with all buttons)
+    navigate(`/intake/${encodeURIComponent(patientId)}?v=${encodeURIComponent(visitId)}&walkin=true`);
   };
 
   return (
@@ -127,9 +111,9 @@ const WalkInPostVisit: React.FC = () => {
           </span>
           <button
             onClick={handleBack}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
           >
-            Back to SOAP
+            Back
           </button>
         </div>
       </div>
@@ -147,27 +131,6 @@ const WalkInPostVisit: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Navigation */}
-      <div className="mb-6 flex gap-3 flex-wrap">
-        <button
-          onClick={handleViewTranscript}
-          className="px-4 py-2 bg-blue-100 text-blue-800 rounded-md hover:bg-blue-200 text-sm"
-        >
-          View Transcript
-        </button>
-        <button
-          onClick={handleViewVitals}
-          className="px-4 py-2 bg-gray-100 text-gray-800 rounded-md hover:bg-gray-200 text-sm"
-        >
-          View Vitals
-        </button>
-        <button
-          onClick={handleViewSoap}
-          className="px-4 py-2 bg-purple-100 text-purple-800 rounded-md hover:bg-purple-200 text-sm"
-        >
-          View SOAP Note
-        </button>
-      </div>
 
       {/* Error Message */}
       {error && (
@@ -201,23 +164,8 @@ const WalkInPostVisit: React.FC = () => {
           </div>
         ) : (
           <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Post-Visit Summary</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={generateSummary}
-                  disabled={loading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 text-sm"
-                >
-                  {loading ? "Regenerating..." : "Regenerate"}
-                </button>
-                <button
-                  onClick={handleComplete}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                >
-                  Complete Visit
-                </button>
-              </div>
             </div>
 
             {/* Summary Sections */}

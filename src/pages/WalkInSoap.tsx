@@ -99,7 +99,8 @@ const WalkInSoap: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate(`/walk-in-vitals/${encodeURIComponent(patientId)}/${encodeURIComponent(visitId)}`);
+    // Navigate back to the main workflow page (intake page with all buttons)
+    navigate(`/intake/${encodeURIComponent(patientId)}?v=${encodeURIComponent(visitId)}&walkin=true`);
   };
 
 
@@ -119,9 +120,9 @@ const WalkInSoap: React.FC = () => {
           </span>
           <button
             onClick={handleBack}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
           >
-            Back to Vitals
+            Back
           </button>
         </div>
       </div>
