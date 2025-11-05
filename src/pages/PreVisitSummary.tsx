@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiClient } from '../lib/api';
-import { Button } from '../components/ui/Button';
+import { Button } from '../components/ui/button';
 import { FileText, AlertTriangle, ArrowRight, ArrowLeft, Image as ImageIcon } from 'lucide-react';
 
 export const PreVisitSummary: React.FC = () => {
