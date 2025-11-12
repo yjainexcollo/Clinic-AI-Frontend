@@ -57,9 +57,9 @@ const VitalsForm: React.FC = () => {
           const urlParams = new URLSearchParams(window.location.search);
           const walkin = urlParams.get("walkin");
           if (walkin === "true") {
-          setIsWalkInPatient(true);
-        } else {
-          setIsWalkInPatient(false);
+            setIsWalkInPatient(true);
+          } else {
+            setIsWalkInPatient(false);
           }
         }
       } catch (error) {
