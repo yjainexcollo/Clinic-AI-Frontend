@@ -237,7 +237,7 @@ const TranscriptUpload: React.FC = () => {
         }
         
         // Fetch the transcript
-        const res = await authorizedFetch(`${BACKEND_BASE_URL}/notes/${encodeURIComponent(patientId)}/visits/${encodeURIComponent(visitId)}/transcript`, {
+        const res = await authorizedFetch(`${BACKEND_BASE_URL}/notes/${encodeURIComponent(patientId)}/visits/${encodeURIComponent(visitId)}/dialogue`, {
           headers: { Accept: "application/json" },
         });
         

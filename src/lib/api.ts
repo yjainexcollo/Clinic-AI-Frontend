@@ -417,7 +417,7 @@ class ApiClient {
   async getTranscript(patientId: string, visitId: string): Promise<ApiResponse<any>> {
     return this.request<any>({
       method: 'GET',
-      url: `/notes/${patientId}/visits/${visitId}/transcript`,
+      url: `/notes/${patientId}/visits/${visitId}/dialogue`,
     });
   }
 
