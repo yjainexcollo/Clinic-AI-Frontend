@@ -9,6 +9,7 @@ export interface CreateWalkInVisitRequest {
   mobile: string;
   age?: number;
   gender?: string;
+  language?: 'en' | 'sp';
 }
 
 export interface CreateWalkInVisitResponse {
