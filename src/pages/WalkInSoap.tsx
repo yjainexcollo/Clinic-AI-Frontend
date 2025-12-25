@@ -244,22 +244,21 @@ const WalkInSoap: React.FC = () => {
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">{t("soap.not_generated")}</h3>
                 <p className="text-gray-600 mb-6">
-                  Click below to configure (optional) a one-time SOAP template and generate the SOAP summary.
+                  {t("soap.prepare_generation_message")}
                 </p>
                 <button
                   onClick={() => setShowGenerationPanel(true)}
                   className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700"
                 >
-                  Prepare SOAP Generation
+                  {t("soap.prepare_generation")}
                 </button>
               </div>
             ) : (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">SOAP Generation Settings</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">{t("soap.generation_settings")}</h3>
                   <p className="text-gray-600 text-sm">
-                    You can fill this template form to guide the SOAP summary for this visit, or skip it and
-                    generate using the default format.
+                    {t("soap.generation_settings_message")}
                   </p>
                 </div>
 
@@ -272,10 +271,10 @@ const WalkInSoap: React.FC = () => {
                         checked={useTemplate}
                         onChange={(e) => setUseTemplate(e.target.checked)}
                       />
-                      <span>Use custom SOAP template for this generation only</span>
+                      <span>{t("soap.use_custom_template")}</span>
                     </label>
                     <span className="text-xs text-gray-500">
-                      If unchecked, the default SOAP structure is used.
+                      {t("soap.default_structure_note")}
                     </span>
                   </div>
 

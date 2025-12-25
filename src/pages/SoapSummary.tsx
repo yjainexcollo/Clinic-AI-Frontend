@@ -353,10 +353,9 @@ const SoapSummary: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-6">
           <div className="space-y-6">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">SOAP Generation Settings</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{t("soap.generation_settings")}</h3>
               <p className="text-gray-600 text-sm">
-                You can fill this template form to guide the SOAP summary for this visit, or skip it and
-                generate using the default format.
+                {t("soap.generation_settings_message")}
               </p>
             </div>
 
@@ -369,10 +368,10 @@ const SoapSummary: React.FC = () => {
                     checked={useTemplate}
                     onChange={(e) => setUseTemplate(e.target.checked)}
                   />
-                  <span>Use custom SOAP template for this generation only</span>
+                  <span>{t("soap.use_custom_template")}</span>
                 </label>
                 <span className="text-xs text-gray-500">
-                  If unchecked, the default SOAP structure is used.
+                  {t("soap.default_structure_note")}
                 </span>
               </div>
 

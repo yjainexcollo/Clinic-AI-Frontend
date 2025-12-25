@@ -441,10 +441,10 @@ export const SoapNote: React.FC = () => {
                       checked={useTemplate}
                       onChange={(e) => setUseTemplate(e.target.checked)}
                     />
-                    Use custom SOAP template for this generation only
+                    {t("soap.use_custom_template")}
                   </label>
                   <span className="text-xs text-gray-500">
-                    If disabled, the default AI format is used.
+                    {t("soap.default_structure_note_disabled")}
                   </span>
                 </div>
 
